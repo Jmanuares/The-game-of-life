@@ -6,7 +6,7 @@
 int read_sock(char str[], int s) 
 {
     int n;
-    n = recv(s, str, 2*MENSAJE_MAXIMO, 0);
+    n = recv(s, str, 2*256, 0);
 
     if (n == 0) 
         return -1;
@@ -25,14 +25,26 @@ int read_sock(char str[], int s)
 // almacena en req. La funcion es bloqueante
 void get_request(struct request* req, int s)
 {
-   // TO DO  
+    char request[256 + 10];
+    int aux = recv(s, request, 256 + 10, 0);
+    if (aux < 0) { 
+    	perror("recibiendo");
+    }
+    strncpy(req->type,((struct request*)request)->type, 10);
+    strncpy(req->msg, ((struct request*)request)->msg, 256);
 }
 
 // Dado un vector de enteros que representan socket descriptors y un request,
 // envía a traves de todos los sockets la request.
 void broadcast(vector<int>& sockets, struct request* req)
 {
-    // TO DO    
+    for (size_t i = 0; i < sockets.size(); i++)
+    {
+        for (size_t j = 0; j < sockets.size(); j++)
+        {
+            send_request(sockets[i][j], req);
+        }
+    }    
 }
 
 // Por siempre, acepta conexiones sobre un socket s en estado listen y 
@@ -57,4 +69,13 @@ static int nonblockingsocket(int s)
         return -1;
 
     return fcntl(s, F_SETFL, flags | O_NONBLOCK);
+}
+
+void send_request(int socket, struct request* req)
+{
+    int aux = send(socket, (char *) req , 256 + 10, 0);
+    if (aux < 0) { 
+    	perror("enviando");
+    }
+    
 }

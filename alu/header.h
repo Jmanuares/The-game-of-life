@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <string>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -23,11 +24,9 @@
 #include <mutex>
 #include <sys/wait.h>
 #include <cassert>
-#define PORT 5030
-#define MENSAJE_MAXIMO  256
-#define MAX_CLIENTS 10
-#define CLIENT_READY "CL_OK\n"
-#define CANT_CLIENTS 9
+#include <time.h>    
+#include <sstream>
+#define PUERTO 5031
 
 using namespace std;
 
@@ -37,7 +36,7 @@ using namespace std;
 
 struct request{
 	char type[10];
-	char msg[MENSAJE_MAXIMO];
+	char msg[256];
 };
 
 // OPCIONAL
@@ -47,9 +46,10 @@ struct client_request{
 
 // Funciones utiles sugeridas
 int read_sock(char str[], int s);
-void broadcast(vector<int>& sockets, struct request* req);
-void get_request(struct request* req, int s);
-void send_request(struct request* req, int s)
+void broadcast(vector<vector<int>> &sockets, struct request* req);
+void get_request(int s, struct request* req);
+void send_request(int s, struct request* req);
 int set_acc_socket(int lsn_port);
 void accept_conns(int s, vector<int>& v );
+void connection_handler(int socket_desc);
 
