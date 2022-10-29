@@ -7,7 +7,7 @@ inline const char *const BoolToString(bool b)
 void callServer(int serverSocket, bool state)
 {
 	request req;
-	strncpy(req.type, "ESTADO_SERVER", 14);
+	strncpy(req.type, "SERVER_STATE", 14);
 	strncpy(req.msg, BoolToString(state), 2);
 	send_request(serverSocket, &req);
 }
@@ -30,7 +30,7 @@ int acceptNeighbours(sockaddr_in addr, int s, vector<int> &listenNeighbours)
 		int socket = accept(s, (struct sockaddr *)&addr, (socklen_t *)&t);
 		if (socket == -1)
 		{
-			perror("aceptando la conexión entrante");
+			perror("validating incoming connection request");
 			exit(1);
 		}
 		listenNeighbours.push_back(socket);
@@ -46,7 +46,7 @@ int connectNeighbour(int gate)
 	int neighboursSocket;
 	if ((neighboursSocket = socket(PF_INET, SOCK_STREAM, 0)) == -1)
 	{
-		perror("creando socket");
+		perror("creating socket");
 		exit(1);
 	}
 	remote.sin_family = AF_INET;
@@ -55,7 +55,7 @@ int connectNeighbour(int gate)
 	int s = connect(neighboursSocket, (struct sockaddr *)&remote, sizeof(remote));
 	if (s == -1)
 	{
-		perror("conectandose");
+		perror("connecting");
 		exit(1);
 	}
 
@@ -107,7 +107,7 @@ void listenNeighbour(vector<int> &neighbourSocket, bool &livingCell, int server)
 void giveInfo(int neighbour, bool state)
 {
 	request req;
-	strncpy(req.type, "ESTADO", 7);
+	strncpy(req.type, "STATE", 7);
 	strncpy(req.msg, BoolToString(state), 2);
 	send_request(neighbour, &req);
 }
@@ -134,7 +134,7 @@ int main(int argc, char const *argv[])
 	bool livingCell = atoi(argv[1]) % 2 == 0;
 	if ((socket_fd = socket(PF_INET, SOCK_STREAM, 0)) == -1)
 	{
-		perror("creando socket");
+		perror("creating socket");
 		exit(1);
 	}
 
@@ -174,16 +174,16 @@ int main(int argc, char const *argv[])
 	int s = connect(socket_fd, (struct sockaddr *)&remote, sizeof(remote));
 	if (s == -1)
 	{
-		perror("conectandose");
+		perror("connecting");
 		exit(1);
 	}
 
 	request req;
-	strncpy(req.type, "PUERTA", 7);
+	strncpy(req.type, "GATE", 7);
 	strncpy(req.msg, to_string(port).c_str(), sizeof(to_string(port).c_str()));
 	send_request(socket_fd, &req);
 	request reqEstado;
-	strncpy(reqEstado.type, "ESTADO_SERVER", 14);
+	strncpy(reqEstado.type, "SERVER_STATE", 14);
 	strncpy(reqEstado.msg, BoolToString(livingCell), 2);
 	send_request(socket_fd, &reqEstado);
 	while (1)
@@ -191,7 +191,7 @@ int main(int argc, char const *argv[])
 		int socket;
 		request req;
 		get_request(&req, socket_fd);
-		if (strncmp(req.type, "VECINOS", 8) == 0)
+		if (strncmp(req.type, "NEIGHBOURS", 8) == 0)
 		{
 			changeNeighbours(string(req.msg), neighbours);
 			threads.push_back(thread(connectNeighbours, neighbours, ref(talkSocket)));

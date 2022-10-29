@@ -11,12 +11,12 @@ int read_sock(char str[], int s)
     if (n == 0) 
         return -1;
     if (n < 0) { 
-        perror("recibiendo");
+        perror("receiving");
         exit(1);
     }
     str[n] = '\0';
     printf("%d\n",n);
-    printf("recibi: %s\n",str);
+    printf("get: %s\n",str);
     return 0;
 }
 
@@ -28,7 +28,7 @@ void get_request(struct request* req, int s)
     char request[256 + 10];
     int aux = recv(s, request, 256 + 10, 0);
     if (aux < 0) { 
-    	perror("recibiendo");
+    	perror("receiving");
     }
     strncpy(req->type,((struct request*)request)->type, 10);
     strncpy(req->msg, ((struct request*)request)->msg, 256);
@@ -52,7 +52,7 @@ void broadcast(vector<vector<int>> &sockets, struct request* req)
 // agrega los sockets asociados al vector v.
 void accept_conns(int s, vector<int> &v)
 {
-     // TO DO  
+   //
 }
 // Dado un puerto lsn_port devuelve un socket en estado listen asociado
 // a todas las interfaces de red local y a ese puerto (ej 127.0.0.1:lsn_port)
@@ -76,7 +76,7 @@ void send_request(int socket, struct request* req)
 {
     int aux = send(socket, (char *) req , 256 + 10, 0);
     if (aux < 0) { 
-    	perror("enviando");
+    	perror("sending");
     }
     
 }
@@ -88,7 +88,7 @@ int read_socket(int s) {
     if (n == 0) 
         return -1;
     if (n < 0) { 
-    	perror("recibiendo");
+    	perror("receiving");
     	return 0;
     }
     str[n] = '\0'; /* Agregar caracter de fin de cadena a lo recibido. */

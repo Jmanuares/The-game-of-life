@@ -48,7 +48,7 @@ void createGroups(vector<vector<int>> &playerSockets, vector<vector<int>> &ports
 			vector<vector<int>> posNeighbours = neighbours(i, j, availableNeighbours, playerSockets.size());
 			string neighbours = gatherNeighbours(ports, posNeighbours);
 			request req;
-			strncpy(req.type, "VECINOS", 8);
+			strncpy(req.type, "NEIGHBOURS", 8);
 			strncpy(req.msg, neighbours.c_str(), 256);
 			send_request(playerSockets[i][j], &req);
 		}
@@ -153,7 +153,7 @@ int main(void)
 	{
 		if ((socket = accept(s, (struct sockaddr *)&remote, (socklen_t *)&t)) == -1)
 		{
-			perror("aceptando la conexión entrante");
+			perror("validating incoming connection request");
 			exit(1);
 		}
 

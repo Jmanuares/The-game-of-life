@@ -1,3 +1,4 @@
+# No anda
 .PHONY: all clean
 
 CC = g++
@@ -11,10 +12,10 @@ OTHER_OBJS = utils.cpp
 
 all: server client
 
-server: server.cpp
+server: server
 	$(CC) $(CFLAGS) -o server server.cpp $(OTHER_OBJS)
 
-client: client.cpp
+client: client
 	$(CC) $(CFLAGS) -o client client.cpp $(OTHER_OBJS)
 
 clean:
