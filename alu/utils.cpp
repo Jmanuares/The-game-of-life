@@ -36,7 +36,7 @@ void get_request(struct request* req, int s)
 
 // Dado un vector de enteros que representan socket descriptors y un request,
 // envía a traves de todos los sockets la request.
-void broadcast(vector<int>& sockets, struct request* req)
+void broadcast(vector<vector<int>> &sockets, struct request* req)
 {
     for (size_t i = 0; i < sockets.size(); i++)
     {
@@ -44,12 +44,13 @@ void broadcast(vector<int>& sockets, struct request* req)
         {
             send_request(sockets[i][j], req);
         }
-    }    
+        
+    }
 }
 
 // Por siempre, acepta conexiones sobre un socket s en estado listen y 
 // agrega los sockets asociados al vector v.
-void accept_conns(int s, vector<int>& v)
+void accept_conns(int s, vector<int> &v)
 {
      // TO DO  
 }
@@ -57,7 +58,7 @@ void accept_conns(int s, vector<int>& v)
 // a todas las interfaces de red local y a ese puerto (ej 127.0.0.1:lsn_port)
 int set_acc_socket(int lsn_port)
 {
-     // TO DO  
+    return 0; 
 }
 
 // Setea un socket al modo nobloqueante
@@ -78,4 +79,26 @@ void send_request(int socket, struct request* req)
     	perror("enviando");
     }
     
+}
+
+int read_socket(int s) {
+	int n;
+	char str[256];
+    n = recv(s, str, 256, 0);
+    if (n == 0) 
+        return -1;
+    if (n < 0) { 
+    	perror("recibiendo");
+    	return 0;
+    }
+    str[n] = '\0'; /* Agregar caracter de fin de cadena a lo recibido. */
+    printf("%s", str);
+    return 0;
+}
+
+void connection_handler(int dSocket){
+    while(1){
+        if(read_socket(dSocket) == -1)
+            break;
+    }      
 }

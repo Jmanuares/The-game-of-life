@@ -1,74 +1,184 @@
 #include "header.h"
+#include <thread>
 using namespace std;
 
-// Sugerencia: El servidor va a necestiar varios threads. Recordar que peuden
-// compartir variables y que por lo tanto las herramientas de sincronziacion
-// como semaforos son perfectamente validas.
-
-
-// Servicio draw: En cada tick, imprime el mapa con el estado de cada celula 
-void draw()
+vector<vector<int>> neighbours(int x, int y, vector<vector<int>> &availableNeighbours, int boardCells)
 {
-    /* TO DO*/
+	vector<vector<int>> neighbours;
+	for (size_t i = 0; i < 8; i++)
+	{
+		int posX = x + availableNeighbours[i][0];
+		int posY = y + availableNeighbours[i][1];
+		if (posX > -1 && posY > -1 && posX < boardCells && posY < boardCells)
+		{
+			neighbours.push_back(vector<int>{posX, posY});
+		}
+	}
+	return neighbours;
 }
 
-// Servicio timer: Cada cierto intervalo de tiempo publica un tick. 
-//Es importante que cada tick se envie utilizando el mapa de vecinos actualizado
-
-void timer()
+string gatherNeighbours(vector<vector<int>> &playerPorts, vector<vector<int>> &posNeighbours)
 {
-   /* TO DO*/
+	string neighbours;
+
+	for (int i = 0; i < posNeighbours.size(); ++i)
+	{
+		neighbours += " ";
+		neighbours += to_string(playerPorts[posNeighbours[i][0]][posNeighbours[i][1]]);
+	}
+	return neighbours;
 }
 
-
-
-// Thread map_creator: Agrega los nuevos nodos al mapa
-void map_creator(/* TO DO*/)
+void createGroups(vector<vector<int>> &playerSockets, vector<vector<int>> &ports)
 {
-  
-    /* Registrar los lsn ports de los nuevos */
-    /* TIP: Hay que esperar que los clientes manden el mensaje con el lsn port*/
-    /* Varias formas de hacerlo, pselect puede resultar comodo para este caso */
-    /* Crear threads podria ser demasiado overhead, pero es valido */
-    /* TO DO*/
+	vector<vector<int>> availableNeighbours;
+	availableNeighbours.push_back(vector<int>{1, 1});
+	availableNeighbours.push_back(vector<int>{0, 1});
+	availableNeighbours.push_back(vector<int>{-1, 1});
+	availableNeighbours.push_back(vector<int>{1, 0});
+	availableNeighbours.push_back(vector<int>{-1, 0});
+	availableNeighbours.push_back(vector<int>{1, -1});
+	availableNeighbours.push_back(vector<int>{0, -1});
+	availableNeighbours.push_back(vector<int>{-1, -1});
 
-    // Avisar a las celulas que correspondan la nueva estructura de vecinos
-    // TIP: Puede ser util separar el caso inicial del resto, sobre todo para
-    //      facilitar luego el testeo
-    if(N ==3){
-        base_case_3x3(/* TO DO*/);
-        return;
-    }
-    general_case_nxn(/* TO DO*/);
-
+	for (size_t i = 0; i < playerSockets.size(); i++)
+	{
+		for (size_t j = 0; j < playerSockets.size(); j++)
+		{
+			vector<vector<int>> posNeighbours = neighbours(i, j, availableNeighbours, playerSockets.size());
+			string neighbours = gatherNeighbours(ports, posNeighbours);
+			request req;
+			strncpy(req.type, "VECINOS", 8);
+			strncpy(req.msg, neighbours.c_str(), 256);
+			send_request(playerSockets[i][j], &req);
+		}
+	}
 }
 
-void server_accept_conns(int s)
+void drawBoard(vector<vector<int>> &playerSockets)
 {
-    while(1)
+	string board = "";
+	for (size_t i = 0; i < playerSockets.size(); i++)
     {
-        /* Acpetar nueva celula*/
-        /* TO DO*/
-        
-        /* Si ya hay suficientes para armar matriz de 3x3 o para agregar L*/
-        /* Actualizar el mapa permitiendo que sigan llegando conexiones */
-        /* Sugerencia: Lanzar thread pmap_creator
-
-        /* Si no, marcarlas como pendientes y continuar*/
-        /* TO DO*/   
-
+		board+= "\n";
+        for (size_t j = 0; j < playerSockets.size(); j++)
+        {
+			request req;
+            get_request(&req,playerSockets[i][j]);
+			board+= " ";
+			board+= req.msg;
+			board+= " ";
+        }   
     }
+	cout << board << endl;
 }
 
-int main(int argc, char* argv[])
+void ticks(vector<vector<int>> &playerSockets)
 {
-    int s;
-    thread ths[MAX_CLIENTS];
-    s = set_acc_socket(atoi(argv[1]));
-
-    /* Levantar servicios y aceptar conexiones */
-   /* TO DO*/
-
-    return 0;
+	int aux = 0;
+	while (1)
+	{
+		drawBoard(playerSockets);
+		string tack = "T" + to_string(aux);
+		int n = tack.length();
+		char time[n + 1];
+		strcpy(time, tack.c_str());
+		request req;
+		strncpy(req.msg, time, sizeof(time));
+		strncpy(req.type, "TACK", 10);
+		broadcast(playerSockets, &req);
+		aux++;
+		sleep(4);
+	}
 }
 
+bool playerCount(vector<vector<int>> &playerSockets, vector<int> &socketsOn, int newSockets)
+{
+	socketsOn.push_back(newSockets);
+	if (socketsOn.size() == 9)
+	{
+		int aux = 0;
+		for (size_t i = 0; i < 3; i++)
+		{
+			for (size_t j = 0; j < 3; j++)
+			{
+				playerSockets[i][j] = socketsOn[aux];
+				aux++;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
+int main(void)
+{
+	int s;
+	struct sockaddr_in local;
+	struct sockaddr_in remote;
+	vector<thread> threads;
+	vector<int> sockets;
+	vector<vector<int>> playerSockets(3, vector<int>(3));
+	vector<vector<int>> ports(3, vector<int>(3));
+
+	/* crea socket */
+	if ((s = socket(PF_INET, SOCK_STREAM, 0)) == -1)
+	{
+		perror("socket");
+		exit(1);
+	}
+
+	/* configura dirección */
+	local.sin_family = AF_INET;
+	local.sin_port = htons(PORT);
+	local.sin_addr.s_addr = INADDR_ANY;
+
+	/* linkea socket con dirección */
+	if (bind(s, (struct sockaddr *)&local, sizeof(local)) < 0)
+	{
+		perror("bind");
+		exit(1);
+	}
+
+	/* setea socket a modo "listen"*/
+	if (listen(s, 10) == -1)
+	{
+		perror("listen");
+		exit(1);
+	}
+
+	int t = sizeof(remote);
+	int socket;
+	for (;;)
+	{
+		if ((socket = accept(s, (struct sockaddr *)&remote, (socklen_t *)&t)) == -1)
+		{
+			perror("aceptando la conexión entrante");
+			exit(1);
+		}
+
+		if (playerCount(playerSockets, sockets, socket))
+		{
+			for (size_t i = 0; i < playerSockets.size(); i++)
+			{
+				for (size_t j = 0; j < playerSockets.size(); j++)
+				{
+					request neighboursRequest;
+					get_request(&neighboursRequest, playerSockets[i][j]);
+					char gates[sizeof(neighboursRequest.msg)];
+					strncpy(gates, neighboursRequest.msg, sizeof(neighboursRequest.msg));
+					ports[i][j] = atoi(gates);
+				}
+			}
+			createGroups(playerSockets, ports);
+			threads.push_back(thread(ticks, ref(playerSockets)));
+		}
+	}
+
+	for (unsigned int i = 0; i < threads.size(); i++)
+	{
+		threads[i].join();
+	}
+
+	return 0;
+}

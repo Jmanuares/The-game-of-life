@@ -1,99 +1,215 @@
 #include "header.h"
 
-using namespace std;
-
-
-// Asumiendo servidor en ip local, y dado un puerto, establece una conexion
-// con el destino retornando un socket en estado conectado en caso de exito
-int connect_socket(int port)
+inline const char *const BoolToString(bool b)
 {
-   // TO DO
+	return b ? "1" : "0";
 }
-
-
-// Dada una lista de puertos de vecinos, conecta el cliente con cada vecino
-// agregando cada socket al vector de sockets
-void con2neigh(string list, vector<int>& sockets)
+void callServer(int serverSocket, bool state)
 {
-    // TO DO
+	request req;
+	strncpy(req.type, "ESTADO_SERVER", 14);
+	strncpy(req.msg, BoolToString(state), 2);
+	send_request(serverSocket, &req);
 }
-
-// Dado el estado actual de la celula y el estado de los vecinos en una ronda
-// computa el nuevo estado de la celula segun las reglas del juego
-bool set_state(bool alive, const vector<request>& cl)
+bool newState(int livingCells, bool state)
 {
-	// TO DO
+	bool newState;
+	if(livingCells > 3) newState = false;
+	if(livingCells < 2 ) newState = false;
+	if(livingCells == 3) newState = true;
+	if(livingCells == 2 && state) newState = true;
+
+	return newState;
 }
 
-int run_cell(int port)
-{   
-    char                buf[MENSAJE_MAXIMO+1];
-    struct request      srv_req;
-    int                 srv_socket, accepting_socket;
-    // Definir estructuras para manejar los sockets
-    // Sugerancia: Diferenciar los canales donde la celula publica su estado
-    //             de los que usa para recibir estado de sus vecinos
-  
-    /* Conectarse al server */
-    srv_socket = connect_socket(htons(port));
+int acceptNeighbours(sockaddr_in addr, int s, vector<int> &listenNeighbours)
+{
+	int t = sizeof(addr);
+	for (;;)
+	{
+		int socket = accept(s, (struct sockaddr *)&addr, (socklen_t *)&t);
+		if (socket == -1)
+		{
+			perror("aceptando la conexión entrante");
+			exit(1);
+		}
+		listenNeighbours.push_back(socket);
+		
+	}
 
-    /* Crear socket de escucha y permitir aceptar conexiones concurrentemente */
-    int lsn_port = /* TO DO*/ ;
-    acc_sock_fd = /* TO DO*/
-    /* TO DO*/
-  
-    /* Enviar msg al srv con el puerto de escucha */
-    /* TO DO*/
-    
-    /* Obtener lista de vecinos inicial */
-    /* TO DO*/
 
-    /* Conectarse a los vecinos */
-    /* TO DO*/ 
-
-    /* Enviar msg ready para el server */
-    /* TO DO*/
-
-    /* Comenzar juego */
-    srand(getpid());
-    char alive = random() % 2;
-    while(1)
-    {
-        // Esperar request del srv
-        get_request(&srv_req, srv_socket);
-        if (strncmp(srv_req.type,"TICK",4) == 0)
-        {
-            /* Publicar estado*/
-            /* TO DO*/
-
-            /* Obtener estado de los vecinos*/
-            /* TO DO*/
-
-            /* Computar nuevo estado*/
-            /* TO DO*/
-
-            /* Informar al srv nuevo estado*/
-            /* TO DO*/
-        }
-        else if (strncmp(srv_req.type,"NEW",3) == 0)
-        {
-            /* Conectarse a los nuevos vecinos*/
-            /* TO DO*/
-
-            /* Avisar con CLIENT_READY al srv*/
-            /* TO DO*/
-
-        } 
-
-    }
-    
-    return;
 }
 
+int connectNeighbour(int gate)
+{
+	struct sockaddr_in remote;
+	int neighboursSocket;
+	if ((neighboursSocket = socket(PF_INET, SOCK_STREAM, 0)) == -1)
+	{
+		perror("creando socket");
+		exit(1);
+	}
+	remote.sin_family = AF_INET;
+	remote.sin_port = htons(gate);
+	remote.sin_addr.s_addr = INADDR_ANY;
+	int s = connect(neighboursSocket, (struct sockaddr *)&remote, sizeof(remote));
+	if (s == -1)
+	{
+		perror("conectandose");
+		exit(1);
+	}
 
-int main(int argc, char* argv[]){
-    int pid;
-    /* Lanzar tantos procesos celulas como los indicados por argv[1]*/
-    /* TO DO*/
-    
+	return neighboursSocket;
+}
+
+void connectNeighbours(vector<int> neighbours, vector<int> &neighboursChat)
+{
+	for (int i = 0; i < neighbours.size(); ++i)
+	{
+		neighboursChat.push_back(connectNeighbour(neighbours[i]));
+	}
+}
+
+void changeNeighbours(string neighbours, vector<int> &oldNeighbours)
+{
+	const char delim = ' ';
+	stringstream ss(neighbours);
+	string s;
+	while (std::getline(ss, s, delim))
+	{
+		if (s != "")
+		{
+			oldNeighbours.push_back(atoi(s.c_str()));
+		}
+	}
+}
+
+void tickNeighbour(int neighbours, request* req)
+{
+	get_request(req, neighbours);
+}
+
+void listenNeighbour(vector<int> &neighbourSocket, bool &livingCell, int server)
+{
+	int livingCells = 0;
+	for (int i = 0; i < neighbourSocket.size(); ++i)
+	{
+		int neighbour = neighbourSocket[i];
+		request req;
+		tickNeighbour(neighbour, &req);
+		if (strncmp(req.msg, "1", 2) == 0) livingCells++;
+	}
+
+	livingCell = newState(livingCells, livingCell);
+	callServer(server, livingCell);
+}
+
+void giveInfo(int neighbour, bool state)
+{
+	request req;
+	strncpy(req.type, "ESTADO", 7);
+	strncpy(req.msg, BoolToString(state), 2);
+	send_request(neighbour, &req);
+}
+
+void answerNeighbour(vector<int> &neighbourSocket, bool state)
+{
+	for (int i = 0; i < neighbourSocket.size(); ++i)
+	{
+		giveInfo(neighbourSocket[i], state);
+	}
+}
+
+int main(int argc, char const *argv[])
+{
+	int socket_fd;
+	int socketEscucha;
+	struct sockaddr_in remote;
+	struct sockaddr_in local;
+	struct in_addr addr;
+	vector<thread> threads;
+	vector<int> neighbours;
+	vector<int> talkSocket;
+	vector<int> listenSocket;
+	bool livingCell = atoi(argv[1]) % 2 == 0;
+	if ((socket_fd = socket(PF_INET, SOCK_STREAM, 0)) == -1)
+	{
+		perror("creando socket");
+		exit(1);
+	}
+
+	/* Establecer la dirección a la cual conectarse. */
+	remote.sin_family = AF_INET;
+	remote.sin_port = htons(PORT);
+	inet_pton(AF_INET, "127.0.0.1", &(remote.sin_addr));
+
+	/* crea socket */
+	if ((socketEscucha = socket(PF_INET, SOCK_STREAM, 0)) == -1)
+	{
+		perror("socket");
+		exit(1);
+	}
+
+	/* configura dirección */
+	int port = atoi(argv[1]);
+	local.sin_family = AF_INET;
+	local.sin_port = htons(port);
+	local.sin_addr.s_addr = INADDR_ANY;
+
+	/* linkea socket con dirección */
+	if (bind(socketEscucha, (struct sockaddr *)&local, sizeof(local)) < 0)
+	{
+		perror("bind");
+		exit(1);
+	}
+
+	/* setea socket a modo "listen"*/
+	if (listen(socketEscucha, 10) == -1)
+	{
+		perror("listen");
+		exit(1);
+	}
+
+	/* Conectarse. */
+	int s = connect(socket_fd, (struct sockaddr *)&remote, sizeof(remote));
+	if (s == -1)
+	{
+		perror("conectandose");
+		exit(1);
+	}
+
+	request req;
+	strncpy(req.type, "PUERTA", 7);
+	strncpy(req.msg, to_string(port).c_str(), sizeof(to_string(port).c_str()));
+	send_request(socket_fd, &req);
+	request reqEstado;
+	strncpy(reqEstado.type, "ESTADO_SERVER", 14);
+	strncpy(reqEstado.msg, BoolToString(livingCell), 2);
+	send_request(socket_fd, &reqEstado);
+	while (1)
+	{
+		int socket;
+		request req;
+		get_request(&req, socket_fd);
+		if (strncmp(req.type, "VECINOS", 8) == 0)
+		{
+			changeNeighbours(string(req.msg), neighbours);
+			threads.push_back(thread(connectNeighbours, neighbours, ref(talkSocket)));
+			threads.push_back(thread(acceptNeighbours, local, socketEscucha, ref(listenSocket)));
+		}
+		if (strncmp(req.type, "TACK", 5) == 0)
+		{
+			threads.push_back(thread(answerNeighbour, ref(talkSocket), livingCell));
+			threads.push_back(thread(listenNeighbour, ref(listenSocket), ref(livingCell), socket_fd));
+		}
+	}
+
+	for (unsigned int i = 0; i < threads.size(); i++)
+	{
+		threads[i].join();
+	}
+
+	/* Cerrar el socket. */
+
+	return 0;
 }
