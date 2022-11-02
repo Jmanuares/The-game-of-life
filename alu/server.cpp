@@ -46,7 +46,7 @@ void createGroups(vector<vector<int>> &playerSockets, vector<vector<int>> &ports
 	}
 }
 
-void drawBoard(vector<vector<int>> &playerSockets){
+bool drawBoard(vector<vector<int>> &playerSockets){
 	string board = "";
 	int deads = 0;
 	for (size_t i = 0; i < playerSockets.size(); i++){
@@ -98,23 +98,21 @@ void ticks(vector<vector<int>> &playerSockets, sem_t &endgame)
 	}
 }
 
-bool playerCount(vector<vector<int>> &playerSockets, vector<int> &socketsOn, int newSockets){
-	socketsOn.push_back(newSockets);
+bool playerCount(vector<vector<int>> &playerSockets, vector<int> &socketsOn){
 	if (socketsOn.size() == 9){
-		int aux = 0;
-		for (size_t i = 0; i < 3; i++){
-			for (size_t j = 0; j < 3; j++){
-				playerSockets[i][j] = socketsOn[aux];
-				aux++;
+		cout << "El juego esta listo" << endl;
+		sleep(1);
+		int numero = 0;
+		for (size_t i = 0; i < playerSockets.size(); i++){
+			for (size_t j = 0; j < playerSockets.size(); j++){
+				playerSockets[i][j] = socketsOn[numero];
+				numero++;
 			}
 		}
 		return true;
 	}
 	return false;
 }
-
-#include "../header.h"
-#include "serverHeader.h"
 
 int main(int argc, char const *argv[]){
 	int s;
@@ -139,23 +137,23 @@ int main(int argc, char const *argv[]){
 	
 	for (size_t i = 0;  i < 9; i++){
 		sem_wait(&clientSem);
-	}
+	};
 	
-	if (playerCount(playerSockets, sockets)){
+	if(playerCount(playerSockets, sockets)){
 		for (size_t i = 0; i < playerSockets.size(); i++){
 			for (size_t j = 0; j < playerSockets.size(); j++){
 				request req;
-				get_request(playerSockets[i][j], &req);
+				get_request(&req, playerSockets[i][j]);
 				char gates[sizeof(req.msg)];
 				strncpy(gates, req.msg, sizeof(req.msg));
 				ports[i][j] = atoi(gates);
 			}
-	}
+		}
 		createGroups(playerSockets, ports);
 		for (size_t i = 0; i < playerSockets.size(); i++){
 			for (size_t j = 0; j < playerSockets.size(); j++){
 				request req;
-				get_request(playerSockets[i][j], &req);
+				get_request(&req,playerSockets[i][j]);
 				if(strncmp(req.type, "READY", 12) == 0) sem_post(&gameReady);
 			}
 			

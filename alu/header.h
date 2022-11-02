@@ -26,6 +26,7 @@
 #include <cassert>
 #include <time.h>    
 #include <sstream>
+#include <math.h>
 #define PORT 5031
 
 using namespace std;
@@ -41,10 +42,9 @@ int read_sock(char str[], int s);
 void broadcast(vector<vector<int>> &sockets, struct request *req);
 void get_request(struct request* req, int s);
 void send_request(int s, struct request *req);
-void accept_conns(int s, vector<int>& v, sem_t& clientSem)
-int set_acc_socket(int lsn_port)
+void accept_conns(int s, vector<int>& v, sem_t& clientSem);
+int set_acc_socket(int lsn_port);
 int read_socket(int s);
 void connection_handler(int dSocket);
 
 
-#endif

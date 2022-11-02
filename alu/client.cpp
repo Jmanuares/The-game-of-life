@@ -1,6 +1,9 @@
 #include "header.h"
 
-inline const char *const BoolToString(bool b) return b ? "1" : "0";
+inline const char *const BoolToString(bool b){
+	return b ? "1" : "0";
+}
+	
 
 void callServer(int serverSocket, bool state){
 	request req;
@@ -11,29 +14,26 @@ void callServer(int serverSocket, bool state){
 
 bool newState(int livingCells, bool state){
 	bool newState;
-	switch (livingCells){
-		case(livingCells > 3):
-			newState = false
-			break;
-
-		case(livingCells < 2 ):
-			newState = false
-			break;
-
-		case(livingCells == 3):
-			newState = true
-			break;
-			
-		case(livingCells == 2 && state):
-			newState = true
-			break;
+	if(livingCells > 3){
+		newState = false;
 	}
+	if(livingCells < 2 ){
+		newState = false;
+	}
+	if (livingCells == 3){
+		newState = true;
+	}
+	if(livingCells == 2 && state){
+		newState = true;
+	}
+	
+	
 	return newState;
 }
 
-int acceptNeighbours(sockaddr_in addr, int s, vector<int> &listenNeighbours){
+void acceptNeighbours(sockaddr_in addr, int s, vector<int> &listenNeighbours, int n, sem_t &sockContinue){
 	int t = sizeof(addr);
-	for (;;){
+	for (size_t i = 0; i < n; i++){
 		int socket = accept(s, (struct sockaddr *)&addr, (socklen_t *)&t);
 		if (socket == -1){
 			perror("validating incoming connection request");
@@ -71,7 +71,7 @@ int connectNeighbour(int gate){
 	return neighboursSocket;
 }
 
-void connectNeighbours(vector<int> neighbours, vector<int> &neighboursChat){
+void connectNeighbours(vector<int> neighbours, vector<int> &neighboursChat, sem_t &sockContinue){
 	for (int i = 0; i < neighbours.size(); ++i)
 		neighboursChat.push_back(connectNeighbour(neighbours[i]));
 }
@@ -81,7 +81,7 @@ void listenNeighbour(vector<int> &neighbourSocket, bool &livingCell, int server)
 	for (int i = 0; i < neighbourSocket.size(); ++i){
 		int neighbour = neighbourSocket[i];
 		request req;
-		get_request(req, neighbours);
+		get_request(&req, neighbour);
 		if (strncmp(req.msg, "1", 2) == 0) livingCells++;
 	}
 
@@ -126,18 +126,18 @@ int main(int argc, char const *argv[]){
 	request req;
 	strncpy(req.type, "GATE", 7);
 	strncpy(req.msg, to_string(port).c_str(), sizeof(to_string(port).c_str()));
-	send_request(server, &req);
+	send_request(mainSocket, &req);
 	request reqEstado;
 
 	/*Recibo request de server hasta que termine el juego.*/
 	while (1){
 		int socket;
 		request req;
-		get_request(mainSocket, &req);
+		get_request(&req, mainSocket);
 		if (strncmp(req.type, "NEIGHBOURS", 8) == 0){
 			changeNeighbours(string(req.msg), neighbours);
 
-			threads.push_back(thread(connectNeighbour, neighbours, ref(socketNeighboursComm), ref(sockContinue)));
+			threads.push_back(thread(connectNeighbours, neighbours, ref(socketNeighboursComm), ref(sockContinue)));
 			threads.push_back(thread(acceptNeighbours, local, listenSocket, ref(ListenNeighboursSocket), neighbours.size(), ref(sockContinue)));
 			for (size_t i = 0; i < 2; i++){
 				sem_wait(&sockContinue);
@@ -148,12 +148,12 @@ int main(int argc, char const *argv[]){
 			send_request(mainSocket, &req);
 			request reqEstado;
 			strncpy(reqEstado.type, "STATE", 10);
-			strncpy(reqEstado.msg, boolToString(vivo), 2);
+			strncpy(reqEstado.msg, BoolToString(livingCell), 2);
 			send_request(mainSocket, &reqEstado);
 		}
 		if (strncmp(req.type, "TACK", 5) == 0){
-			threads.push_back(thread(answerNeighbour, ref(socketNeighboursComm), vivo));
-			threads.push_back(thread(listenNeighbour, ref(ListenNeighboursSocket), ref(vivo), mainSocket));
+			threads.push_back(thread(answerNeighbour, ref(socketNeighboursComm), livingCell));
+			threads.push_back(thread(listenNeighbour, ref(ListenNeighboursSocket), ref(livingCell), mainSocket));
 		}
 
 		if (strncmp(req.type, "END", 4) == 0){
