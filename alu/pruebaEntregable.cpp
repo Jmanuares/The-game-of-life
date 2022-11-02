@@ -1,7 +1,7 @@
 #include "header.h"
 
 void client(int aux, int serverPort){
-    std::string bash = "./client ";
+    std::string bash = "./cell ";
     bash += std::to_string(aux);
     bash += " ";
     bash += std::to_string(serverPort);
@@ -14,7 +14,7 @@ void clients(vector<thread> &threads, int clients, int serverPort){
 }
 
 void server(int port){
-    std::string bash = "./server ";
+    std::string bash = "./board ";
     bash += std::to_string(port);
     system(bash.c_str());
 }
@@ -22,9 +22,9 @@ void server(int port){
 int main(int argc, char const *argv[]){
     srand(time(0));
     vector <thread> threads;
-    threads.push_back(thread(server, atoi(argv[2])));
+    threads.push_back(thread(server, atoi(argv[1])));
     
-    threads.push_back(thread(clients, ref(threads), atoi(argv[1]), atoi(argv[2])));
+    threads.push_back(thread(clients, ref(threads), 9, atoi(argv[1])));
     
     for (unsigned int i = 0; i < threads.size(); i++)
 		threads[i].join();

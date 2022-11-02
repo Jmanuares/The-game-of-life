@@ -39,7 +39,7 @@ void createGroups(vector<vector<int>> &playerSockets, vector<vector<int>> &ports
 			vector<vector<int>> posNeighbours = neighbours(i, j, availableNeighbours, playerSockets.size());
 			string neighbours = gatherNeighbours(ports, posNeighbours);
 			request req;
-			strncpy(req.type, "NEIGHBOURS", 8);
+			strncpy(req.type, "CELLS", 6);
 			strncpy(req.msg, neighbours.c_str(), 256);
 			send_request(playerSockets[i][j], &req);
 		}
@@ -77,10 +77,10 @@ void ticks(vector<vector<int>> &playerSockets, sem_t &endgame)
 		sleep(4);
 		if (drawBoard(playerSockets))
 		{
-			string tack = "T" + to_string(aux);
+			string tick = "T" + to_string(aux);
 			request req;
-			strncpy(req.msg, tack.c_str(), sizeof(tack.c_str()));
-			strncpy(req.type, "TACK", 5);
+			strncpy(req.msg, tick.c_str(), sizeof(tick.c_str()));
+			strncpy(req.type, "tick", 5);
 			broadcast(playerSockets, &req);
 			aux++;
 		}
@@ -101,12 +101,12 @@ void ticks(vector<vector<int>> &playerSockets, sem_t &endgame)
 bool playerCount(vector<vector<int>> &playerSockets, vector<int> &socketsOn){
 	if (socketsOn.size() == 9){
 		cout << "El juego esta listo" << endl;
-		sleep(1);
-		int numero = 0;
+		sleep(3);
+		int aux = 0;
 		for (size_t i = 0; i < playerSockets.size(); i++){
 			for (size_t j = 0; j < playerSockets.size(); j++){
-				playerSockets[i][j] = socketsOn[numero];
-				numero++;
+				playerSockets[i][j] = socketsOn[aux];
+				aux++;
 			}
 		}
 		return true;
@@ -154,7 +154,7 @@ int main(int argc, char const *argv[]){
 			for (size_t j = 0; j < playerSockets.size(); j++){
 				request req;
 				get_request(&req,playerSockets[i][j]);
-				if(strncmp(req.type, "READY", 12) == 0) sem_post(&gameReady);
+				if(strncmp(req.type, "READY", 6) == 0) sem_post(&gameReady);
 			}
 			
 		}

@@ -1,5 +1,5 @@
 clear
-g++ -pthread -g -o server server.cpp utils.cpp
-g++ -pthread -g -o client client.cpp utils.cpp
-g++ -pthread -g -o prueba pruebaEntregable.cpp utils.cpp
+g++ -pthread -g -o board server.cpp utils.cpp
+g++ -pthread -g -o cell client.cpp utils.cpp
+g++ -pthread -g -o pruebaEntregable pruebaEntregable.cpp utils.cpp
 

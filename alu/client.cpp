@@ -7,7 +7,7 @@ inline const char *const BoolToString(bool b){
 
 void callServer(int serverSocket, bool state){
 	request req;
-	strncpy(req.type, "SERVER_STATE", 14);
+	strncpy(req.type, "STATE", 6);
 	strncpy(req.msg, BoolToString(state), 2);
 	send_request(serverSocket, &req);
 }
@@ -40,6 +40,7 @@ void acceptNeighbours(sockaddr_in addr, int s, vector<int> &listenNeighbours, in
 			exit(1);
 		}
 		listenNeighbours.push_back(socket);	
+		sem_post(&sockContinue);
 	}
 }
 
@@ -74,6 +75,8 @@ int connectNeighbour(int gate){
 void connectNeighbours(vector<int> neighbours, vector<int> &neighboursChat, sem_t &sockContinue){
 	for (int i = 0; i < neighbours.size(); ++i)
 		neighboursChat.push_back(connectNeighbour(neighbours[i]));
+
+	sem_post(&sockContinue);
 }
 
 void listenNeighbour(vector<int> &neighbourSocket, bool &livingCell, int server){
@@ -91,7 +94,7 @@ void listenNeighbour(vector<int> &neighbourSocket, bool &livingCell, int server)
 
 void giveInfo(int neighbour, bool state){
 	request req;
-	strncpy(req.type, "STATE", 7);
+	strncpy(req.type, "STATE", 6);
 	strncpy(req.msg, BoolToString(state), 2);
 	send_request(neighbour, &req);
 }
@@ -124,7 +127,7 @@ int main(int argc, char const *argv[]){
 
 	/*Manda informacion necesaria para comenzar el juego.*/
 	request req;
-	strncpy(req.type, "GATE", 7);
+	strncpy(req.type, "GATE", 5);
 	strncpy(req.msg, to_string(port).c_str(), sizeof(to_string(port).c_str()));
 	send_request(mainSocket, &req);
 	request reqEstado;
@@ -134,7 +137,7 @@ int main(int argc, char const *argv[]){
 		int socket;
 		request req;
 		get_request(&req, mainSocket);
-		if (strncmp(req.type, "NEIGHBOURS", 8) == 0){
+		if (strncmp(req.type, "CELLS", 6) == 0){
 			changeNeighbours(string(req.msg), neighbours);
 
 			threads.push_back(thread(connectNeighbours, neighbours, ref(socketNeighboursComm), ref(sockContinue)));
@@ -143,15 +146,15 @@ int main(int argc, char const *argv[]){
 				sem_wait(&sockContinue);
 			}
 			request req;
-			strncpy(req.type, "READY", 12);
+			strncpy(req.type, "READY", 6);
 			strncpy(req.msg, "ok", 3);
 			send_request(mainSocket, &req);
 			request reqEstado;
-			strncpy(reqEstado.type, "STATE", 10);
+			strncpy(reqEstado.type, "STATE", 6);
 			strncpy(reqEstado.msg, BoolToString(livingCell), 2);
 			send_request(mainSocket, &reqEstado);
 		}
-		if (strncmp(req.type, "TACK", 5) == 0){
+		if (strncmp(req.type, "tick", 5) == 0){
 			threads.push_back(thread(answerNeighbour, ref(socketNeighboursComm), livingCell));
 			threads.push_back(thread(listenNeighbour, ref(ListenNeighboursSocket), ref(livingCell), mainSocket));
 		}
