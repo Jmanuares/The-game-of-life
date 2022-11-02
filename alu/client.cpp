@@ -43,6 +43,15 @@ int acceptNeighbours(sockaddr_in addr, int s, vector<int> &listenNeighbours){
 	}
 }
 
+void changeNeighbours(string neighbours, vector<int> &oldNeighbours){
+	const char limit = ' ';
+	string x;
+	stringstream ss(neighbours);
+	while (std::getline(ss, x, limit)){
+		if (x != "") oldNeighbours.push_back(atoi(x.c_str()));
+	}
+}
+
 int connectNeighbour(int gate){
 	struct sockaddr_in remote;
 	int neighboursSocket;
@@ -65,15 +74,6 @@ int connectNeighbour(int gate){
 void connectNeighbours(vector<int> neighbours, vector<int> &neighboursChat){
 	for (int i = 0; i < neighbours.size(); ++i)
 		neighboursChat.push_back(connectNeighbour(neighbours[i]));
-}
-
-void changeNeighbours(string neighbours, vector<int> &oldNeighbours){
-	const char limit = ' ';
-	stringstream ss(neighbours);
-	string x;
-	while (std::getline(ss, x, limit)){
-		if (x != "") oldNeighbours.push_back(atoi(x.c_str()));
-	}
 }
 
 void listenNeighbour(vector<int> &neighbourSocket, bool &livingCell, int server){
@@ -103,81 +103,66 @@ void answerNeighbour(vector<int> &neighbourSocket, bool state){
 }
 
 int main(int argc, char const *argv[]){
+	int mainSocket;
+	int listenSocket;
 	bool livingCell = atoi(argv[1]) % 2 == 0;
-	int socket_fd;
-	int socketEscucha;
 	struct sockaddr_in remote;
 	struct sockaddr_in local;
-	struct in_addr addr;
 	vector<thread> threads;
 	vector<int> neighbours;
-	vector<int> talkNeighbourSocket;
-	vector<int> listenNeighbourSocket;
-	if ((socket_fd = socket(PF_INET, SOCK_STREAM, 0)) == -1){
-		perror("creating socket");
-		exit(1);
-	}
+	vector<int> socketNeighboursComm;
+	vector<int> ListenNeighboursSocket;
+	sem_t sockContinue;
+	sem_init(&sockContinue, 0, 0);
 
-	/* Establecer la dirección a la cual conectarse. */
-	remote.sin_family = AF_INET;
-	remote.sin_port = htons(PORT);
-	inet_pton(AF_INET, "127.0.0.1", &(remote.sin_addr));
+	/*Crea socket que conectara al servidor*/
+	mainSocket = connectNeighbour(atoi(argv[2]));
 
-	/* crea socket */
-	if ((socketEscucha = socket(PF_INET, SOCK_STREAM, 0)) == -1){
-		perror("socket");
-		exit(1);
-	}
-
-	/* configura dirección */
+	/* Crea socket para escuchar vecinos */
 	int port = atoi(argv[1]);
-	local.sin_family = AF_INET;
-	local.sin_port = htons(port);
-	local.sin_addr.s_addr = INADDR_ANY;
+	listenSocket = set_acc_socket(port);
 
-	/* linkea socket con dirección */
-	if (bind(socketEscucha, (struct sockaddr *)&local, sizeof(local)) < 0){
-		perror("bind");
-		exit(1);
-	}
-
-	/* setea socket a modo "listen"*/
-	if (listen(socketEscucha, 10) == -1){
-		perror("listen");
-		exit(1);
-	}
-
-	/* Conectarse. */
-	int s = connect(socket_fd, (struct sockaddr *)&remote, sizeof(remote));
-	if (s == -1){
-		perror("connecting");
-		exit(1);
-	}
-
+	/*Manda informacion necesaria para comenzar el juego.*/
 	request req;
 	strncpy(req.type, "GATE", 7);
 	strncpy(req.msg, to_string(port).c_str(), sizeof(to_string(port).c_str()));
-	send_request(socket_fd, &req);
+	send_request(server, &req);
 	request reqEstado;
-	strncpy(reqEstado.type, "SERVER_STATE", 14);
-	strncpy(reqEstado.msg, BoolToString(livingCell), 2);
-	send_request(socket_fd, &reqEstado);
+
+	/*Recibo request de server hasta que termine el juego.*/
 	while (1){
 		int socket;
 		request req;
-		get_request(&req, socket_fd);
+		get_request(mainSocket, &req);
 		if (strncmp(req.type, "NEIGHBOURS", 8) == 0){
 			changeNeighbours(string(req.msg), neighbours);
-			threads.push_back(thread(connectNeighbours, neighbours, ref(talkNeighbourSocket)));
-			threads.push_back(thread(acceptNeighbours, local, socketEscucha, ref(listenNeighbourSocket)));
+
+			threads.push_back(thread(connectNeighbour, neighbours, ref(socketNeighboursComm), ref(sockContinue)));
+			threads.push_back(thread(acceptNeighbours, local, listenSocket, ref(ListenNeighboursSocket), neighbours.size(), ref(sockContinue)));
+			for (size_t i = 0; i < 2; i++){
+				sem_wait(&sockContinue);
+			}
+			request req;
+			strncpy(req.type, "READY", 12);
+			strncpy(req.msg, "ok", 3);
+			send_request(mainSocket, &req);
+			request reqEstado;
+			strncpy(reqEstado.type, "STATE", 10);
+			strncpy(reqEstado.msg, boolToString(vivo), 2);
+			send_request(mainSocket, &reqEstado);
 		}
 		if (strncmp(req.type, "TACK", 5) == 0){
-			threads.push_back(thread(answerNeighbour, ref(talkNeighbourSocket), livingCell));
-			threads.push_back(thread(listenNeighbour, ref(listenNeighbourSocket), ref(livingCell), socket_fd));
+			threads.push_back(thread(answerNeighbour, ref(socketNeighboursComm), vivo));
+			threads.push_back(thread(listenNeighbour, ref(ListenNeighboursSocket), ref(vivo), mainSocket));
+		}
+
+		if (strncmp(req.type, "END", 4) == 0){
+			break;
 		}
 	}
 
-	for (unsigned int i = 0; i < threads.size(); i++)threads[i].join();
+	for (unsigned int i = 0; i < threads.size(); i++)
+		threads[i].join();
 
 	return 0;
 }

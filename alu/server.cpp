@@ -48,33 +48,53 @@ void createGroups(vector<vector<int>> &playerSockets, vector<vector<int>> &ports
 
 void drawBoard(vector<vector<int>> &playerSockets){
 	string board = "";
+	int deads = 0;
 	for (size_t i = 0; i < playerSockets.size(); i++){
 		board+= "\n";
         for (size_t j = 0; j < playerSockets.size(); j++){
 			request req;
             get_request(&req,playerSockets[i][j]);
+			if(strncmp(req.msg, "0", 2) == 0) deads++;
 			board+= " ";
 			board+= req.msg;
 			board+= " ";
         }   
     }
 	cout << board << endl;
+
+	if(deads == pow(playerSockets.size(), 2))
+		return false;
+	
+	return true;
 }
 
-void ticks(vector<vector<int>> &playerSockets){
+void ticks(vector<vector<int>> &playerSockets, sem_t &endgame)
+{
 	int aux = 0;
-	while (1){
-		drawBoard(playerSockets);
-		string tack = "T" + to_string(aux);
-		int n = tack.length();
-		char time[n + 1];
-		strcpy(time, tack.c_str());
-		request req;
-		strncpy(req.msg, time, sizeof(time));
-		strncpy(req.type, "TACK", 10);
-		broadcast(playerSockets, &req);
-		aux++;
+
+	while (1)
+	{
 		sleep(4);
+		if (drawBoard(playerSockets))
+		{
+			string tack = "T" + to_string(aux);
+			request req;
+			strncpy(req.msg, tack.c_str(), sizeof(tack.c_str()));
+			strncpy(req.type, "TACK", 5);
+			broadcast(playerSockets, &req);
+			aux++;
+		}
+		else
+		{
+			cout << "Todas las celulas murieron :( " << endl;
+			request req;
+			strncpy(req.msg, "El juego termino", 17);
+			strncpy(req.type, "END", 4);
+			broadcast(playerSockets, &req);
+			sem_post(&endgame);
+			exit(0);
+		}
+		
 	}
 }
 
@@ -93,7 +113,10 @@ bool playerCount(vector<vector<int>> &playerSockets, vector<int> &socketsOn, int
 	return false;
 }
 
-int main(void){
+#include "../header.h"
+#include "serverHeader.h"
+
+int main(int argc, char const *argv[]){
 	int s;
 	struct sockaddr_in local;
 	struct sockaddr_in remote;
@@ -102,53 +125,50 @@ int main(void){
 	vector<vector<int>> playerSockets(3, vector<int>(3));
 	vector<vector<int>> ports(3, vector<int>(3));
 
+	sem_t clientSem;
+	sem_init(&clientSem, 0, 0);
+	sem_t gameReady;
+	sem_init(&gameReady, 0, 0);
+	sem_t endgame;
+	sem_init(&endgame, 0, 0);
 	/* crea socket */
-	if ((s = socket(PF_INET, SOCK_STREAM, 0)) == -1){
-		perror("socket");
-		exit(1);
-	}
-
-	/* configura dirección */
-	local.sin_family = AF_INET;
-	local.sin_port = htons(PORT);
-	local.sin_addr.s_addr = INADDR_ANY;
-
-	/* linkea socket con dirección */
-	if (bind(s, (struct sockaddr *)&local, sizeof(local)) < 0){
-		perror("bind");
-		exit(1);
-	}
-
-	/* setea socket a modo "listen"*/
-	if (listen(s, 10) == -1){
-		perror("listen");
-		exit(1);
-	}
-
+	s = set_acc_socket(atoi(argv[1]));
 	int t = sizeof(remote);
-	int socket;
-	for (;;){
-		if ((socket = accept(s, (struct sockaddr *)&remote, (socklen_t *)&t)) == -1){
-			perror("validating incoming connection request");
-			exit(1);
-		}
-
-		if (playerCount(playerSockets, sockets, socket)){
-			for (size_t i = 0; i < playerSockets.size(); i++){
-				for (size_t j = 0; j < playerSockets.size(); j++){
-					request neighboursRequest;
-					get_request(&neighboursRequest, playerSockets[i][j]);
-					char gates[sizeof(neighboursRequest.msg)];
-					strncpy(gates, neighboursRequest.msg, sizeof(neighboursRequest.msg));
-					ports[i][j] = atoi(gates);
-				}
-			}
-			createGroups(playerSockets, ports);
-			threads.push_back(thread(ticks, ref(playerSockets)));
-		}
+	
+	threads.push_back(thread(accept_conns, s, ref(sockets), ref(clientSem)));
+	
+	for (size_t i = 0;  i < 9; i++){
+		sem_wait(&clientSem);
 	}
-
-	for (unsigned int i = 0; i < threads.size(); i++) threads[i].join();
-
+	
+	if (playerCount(playerSockets, sockets)){
+		for (size_t i = 0; i < playerSockets.size(); i++){
+			for (size_t j = 0; j < playerSockets.size(); j++){
+				request req;
+				get_request(playerSockets[i][j], &req);
+				char gates[sizeof(req.msg)];
+				strncpy(gates, req.msg, sizeof(req.msg));
+				ports[i][j] = atoi(gates);
+			}
+	}
+		createGroups(playerSockets, ports);
+		for (size_t i = 0; i < playerSockets.size(); i++){
+			for (size_t j = 0; j < playerSockets.size(); j++){
+				request req;
+				get_request(playerSockets[i][j], &req);
+				if(strncmp(req.type, "READY", 12) == 0) sem_post(&gameReady);
+			}
+			
+		}
+		for (size_t i = 0;  i < 9; i++){
+			sem_wait(&gameReady);
+		}
+		threads.push_back(thread(ticks, ref(playerSockets), ref(endgame)));
+	}
+		
+	sem_wait(&endgame);
+	for (unsigned int i = 0; i < threads.size(); i++)
+		threads[0].join();
+	
 	return 0;
 }

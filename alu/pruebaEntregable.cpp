@@ -1,22 +1,33 @@
 #include "header.h"
 
-void createClients(int numero){
-    std::string comando = "./client ";
-    comando += std::to_string(numero);
-    system(comando.c_str());
+void client(int aux, int serverPort){
+    std::string bash = "./client ";
+    bash += std::to_string(aux);
+    bash += " ";
+    bash += std::to_string(serverPort);
+    system(bash.c_str());
 }
 
-int main(int argc, char const *argv[])
-{
+void clients(vector<thread> &threads, int clients, int serverPort){
+    for (size_t i = 0; i < clients; i++)
+        threads.push_back(thread(client, (rand()%(serverPort*2)) + serverPort, serverPort));
+}
+
+void server(int port){
+    std::string bash = "./server ";
+    bash += std::to_string(port);
+    system(bash.c_str());
+}
+
+int main(int argc, char const *argv[]){
     srand(time(0));
     vector <thread> threads;
-    for(size_t i = 0; i < 9; i++){
-        threads.push_back(thread(createClients, (rand()%5000) + 1025));
-    }
-
-    for(unsigned int i = 0; i < 9; i++){
+    threads.push_back(thread(server, atoi(argv[2])));
+    
+    threads.push_back(thread(clients, ref(threads), atoi(argv[1]), atoi(argv[2])));
+    
+    for (unsigned int i = 0; i < threads.size(); i++)
 		threads[i].join();
-	}
 
     return 0;
 }

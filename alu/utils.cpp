@@ -42,10 +42,52 @@ void broadcast(vector<vector<int>> &sockets, struct request* req){
     }
 }
 
+// Por siempre, acepta conexiones sobre un socket s en estado listen y 
+// agrega los sockets asociados al vector v.
+void accept_conns(int s, vector<int>& v, sem_t& clientSem){
+	struct sockaddr_in remote;
+	int t = sizeof(remote);
+	int socket;
+	for (size_t i = 0; i < 9;i++){
+		if ((socket = accept(s, (struct sockaddr *)&remote, (socklen_t *)&t)) == -1){
+			perror("validating incoming connection request");
+			exit(1);
+		}
+		v.push_back(socket);
+		sem_post(&clientSem);
+	}  
+}
+
+// Dado un puerto lsn_port devuelve un socket en estado listen asociado
+// a todas las interfaces de red local y a ese puerto (ej 127.0.0.1:lsn_port)
+int set_acc_socket(int lsn_port){
+	int s;
+	if ((s = socket(PF_INET, SOCK_STREAM, 0)) == -1){
+		perror("socket");
+		exit(1);
+	}
+	struct sockaddr_in local;
+
+	local.sin_family = AF_INET;
+	local.sin_port = htons(lsn_port);
+	local.sin_addr.s_addr = INADDR_ANY;
+
+	if (bind(s, (struct sockaddr *)&local, sizeof(local)) < 0){
+		perror("bind");
+		exit(1);
+	}
+
+	if (listen(s, 10) == -1){
+		perror("listen");
+		exit(1);
+	}
+
+	return s;
+}
+
 
 // Setea un socket al modo nobloqueante
-static int nonblockingsocket(int s)
-{
+static int nonblockingsocket(int s){
     int flags;
 
     if ((flags = fcntl(s, F_GETFL)) == -1) return -1;
@@ -53,8 +95,7 @@ static int nonblockingsocket(int s)
     return fcntl(s, F_SETFL, flags | O_NONBLOCK);
 }
 
-void send_request(int socket, struct request* req)
-{
+void send_request(int socket, struct request* req){
     int aux = send(socket, (char *) req , 256 + 10, 0);
     if (aux < 0) perror("sending");
 
