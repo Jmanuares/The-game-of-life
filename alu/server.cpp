@@ -68,7 +68,7 @@ bool drawBoard(vector<vector<int>> &playerSockets){
 	return true;
 }
 
-void ticks(vector<vector<int>> &playerSockets, sem_t &endgame)
+void ticks(vector<vector<int>> &playerSockets, sem_t &endgame, vector<thread>& threads)
 {
 	int aux = 0;
 
@@ -161,7 +161,7 @@ int main(int argc, char const *argv[]){
 		for (size_t i = 0;  i < 9; i++){
 			sem_wait(&gameReady);
 		}
-		threads.push_back(thread(ticks, ref(playerSockets), ref(endgame)));
+		threads.push_back(thread(ticks, ref(playerSockets), ref(endgame),ref(threads)));
 	}
 		
 	sem_wait(&endgame);

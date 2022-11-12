@@ -26,6 +26,9 @@ void get_request(struct request* req, int s){
     int aux = recv(s, request, 256 + 10, 0);
     if (aux < 0){ 
     	perror("receiving");
+    } else if (aux==0){
+        perror("Lost connection");
+        exit(1);
     }
     strncpy(req->type,((struct request*)request)->type, 10);
     strncpy(req->msg, ((struct request*)request)->msg, 256);

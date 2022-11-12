@@ -8,9 +8,18 @@ void client(int aux, int serverPort){
     system(bash.c_str());
 }
 
-void clients(vector<thread> &threads, int clients, int serverPort){
-    for (size_t i = 0; i < clients; i++)
-        threads.push_back(thread(client, (rand()%(serverPort*2)) + serverPort, serverPort));
+void clients(int clients, int serverPort){
+    int pid;
+    int random = rand()%(serverPort*2);
+    for (int i = 0; i < clients; i++){
+        pid = -1;
+        pid = fork();
+        random += 1;
+        if (pid==0){
+            client((random), serverPort);
+            return;
+        }
+    }
 }
 
 void server(int port){
@@ -24,7 +33,7 @@ int main(int argc, char const *argv[]){
     vector <thread> threads;
     threads.push_back(thread(server, atoi(argv[1])));
     
-    threads.push_back(thread(clients, ref(threads), 9, atoi(argv[1])));
+    threads.push_back(thread(clients, 9, atoi(argv[1])));
     
     for (unsigned int i = 0; i < threads.size(); i++)
 		threads[i].join();
