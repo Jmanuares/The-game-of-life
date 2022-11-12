@@ -137,6 +137,15 @@ int main(int argc, char const *argv[]){
 		int socket;
 		request req;
 		get_request(&req, mainSocket);
+		if (strncmp(req.type, "END", 4) == 0){
+			for (int i = 0 ; i < ListenNeighboursSocket.size(); i++)
+				close(ListenNeighboursSocket[i]);
+
+			for (unsigned int i = 0; i < threads.size(); i++)
+				threads[0].join();
+
+			exit(1);
+		}
 		if (strncmp(req.type, "CELLS", 6) == 0){
 			changeNeighbours(string(req.msg), neighbours);
 
