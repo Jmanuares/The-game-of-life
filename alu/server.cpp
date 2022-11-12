@@ -168,5 +168,10 @@ int main(int argc, char const *argv[]){
 	for (unsigned int i = 0; i < threads.size(); i++)
 		threads[0].join();
 	
+	for (int i = 0 ; i < sockets.size(); i++)
+		close(sockets[i]);
+
+	close(s);
+
 	return 0;
 }

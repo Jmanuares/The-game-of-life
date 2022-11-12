@@ -57,8 +57,10 @@ void accept_conns(int s, vector<int>& v, sem_t& clientSem){
 			exit(1);
 		}
 		v.push_back(socket);
+        
 		sem_post(&clientSem);
 	}  
+
 }
 
 // Dado un puerto lsn_port devuelve un socket en estado listen asociado
