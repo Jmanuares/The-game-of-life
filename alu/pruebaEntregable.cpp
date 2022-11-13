@@ -10,13 +10,13 @@ void client(int aux, int serverPort){
 
 void clients(int clients, int serverPort){
     int pid;
-    int random = rand()%(serverPort*2);
+    int random = rand()%8000 + 2000;
     for (int i = 0; i < clients; i++){
         pid = -1;
         pid = fork();
         random += 1;
         if (pid==0){
-            client((random), serverPort);
+            client(random, serverPort);
             return;
         }
     }

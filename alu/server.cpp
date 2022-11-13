@@ -92,7 +92,6 @@ void ticks(vector<vector<int>> &playerSockets, sem_t &endgame, vector<thread>& t
 			strncpy(req.type, "END", 4);
 			broadcast(playerSockets, &req);
 			sem_post(&endgame);
-			exit(0);
 		}
 		
 	}
@@ -166,7 +165,7 @@ int main(int argc, char const *argv[]){
 		
 	sem_wait(&endgame);
 	for (unsigned int i = 0; i < threads.size(); i++)
-		threads[0].join();
+		threads[i].join();
 	
 	for (int i = 0 ; i < sockets.size(); i++)
 		close(sockets[i]);

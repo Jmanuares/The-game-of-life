@@ -141,10 +141,8 @@ int main(int argc, char const *argv[]){
 			for (int i = 0 ; i < ListenNeighboursSocket.size(); i++)
 				close(ListenNeighboursSocket[i]);
 
-			for (unsigned int i = 0; i < threads.size(); i++)
-				threads[0].join();
 
-			exit(1);
+			break;
 		}
 		if (strncmp(req.type, "CELLS", 6) == 0){
 			changeNeighbours(string(req.msg), neighbours);
@@ -168,9 +166,6 @@ int main(int argc, char const *argv[]){
 			threads.push_back(thread(listenNeighbour, ref(ListenNeighboursSocket), ref(livingCell), mainSocket));
 		}
 
-		if (strncmp(req.type, "END", 4) == 0){
-			break;
-		}
 	}
 
 	for (unsigned int i = 0; i < threads.size(); i++)
